@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 
+// App entry point
 @main struct MyApp: App {
     var body: some Scene {
         WindowGroup {
@@ -10,14 +11,22 @@ import Combine
 }
 
 struct ContentView: View {
-    // Total session length — used to calculate how full the ring should be
-    let totalSeconds = 25 * 60
+    // Controls which screen is showing
+    @State private var isSelecting = true
 
-    // Track how many seconds are left and whether the timer is running
+    // The duration the user picked on the selection screen
+    @State private var selectedMinutes = 25
+
+    // Total seconds for the session — set when the user taps Start
+    @State private var totalSeconds = 25 * 60
+
+    // How many seconds are left on the countdown
     @State private var secondsRemaining = 25 * 60
+
+    // Whether the timer is actively ticking
     @State private var isRunning = false
 
-    // Fires every second
+    // Fires every second on the main thread
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     // 1.0 when full, shrinks toward 0.0 as time runs out
@@ -25,70 +34,101 @@ struct ContentView: View {
         Double(secondsRemaining) / Double(totalSeconds)
     }
 
-    // Format seconds into MM:SS
+    // Converts raw seconds into a MM:SS string
     var timeString: String {
         String(format: "%02d:%02d", secondsRemaining / 60, secondsRemaining % 60)
     }
 
     var body: some View {
-        // Outer ZStack so the dark purple background sits behind everything
         ZStack {
-            // Dark purple background
+            // Dark purple background filling the whole screen
             Color(red: 0.1, green: 0.05, blue: 0.2)
                 .ignoresSafeArea()
 
-            VStack(spacing: 40) {
-                // Inner ZStack layers the two rings and the countdown on top of each other
-                ZStack {
-                    // Faint full circle acting as the ring track
-                    Circle()
-                        .stroke(Color.purple.opacity(0.2), lineWidth: 14)
-
-                    // Light purple arc, trimmed by progress so it drains as time passes
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(
-                            Color(red: 0.7, green: 0.5, blue: 1.0),
-                            style: StrokeStyle(lineWidth: 14, lineCap: .round)
-                        )
-                        // Rotate so the arc starts at the top instead of the right
-                        .rotationEffect(.degrees(-90))
-                        // Smooth 1-second animation between each tick
-                        .animation(.linear(duration: 1), value: progress)
-
-                    // Countdown display
-                    Text(timeString)
-                        .font(.system(size: 56, weight: .light, design: .rounded))
+            if isSelecting {
+                // ── SELECTION SCREEN ──────────────────────────
+                VStack(spacing: 40) {
+                    Text("Focused")
+                        .font(.system(size: 36, weight: .light, design: .rounded))
                         .foregroundStyle(.white)
-                }
-                .frame(width: 260, height: 260)
 
-                HStack(spacing: 24) {
-                    if isRunning {
-                        // Timer is running — only show the pause button
-                        Button("Pause") {
-                            isRunning = false
+                    // Wheel picker for choosing the session length
+                    Picker("Duration", selection: $selectedMinutes) {
+                        ForEach([5, 10, 15, 20, 25, 30, 45, 60], id: \.self) { m in
+                            Text(m == 60 ? "1 hour" : "\(m) min").tag(m)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
-                    } else {
-                        // Timer is paused — show start on the left, reset on the right
-                        Button("Start") {
-                            isRunning = true
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
-
-                        // Stops the timer and resets to 25 minutes
-                        Button("Reset") {
-                            isRunning = false
-                            secondsRemaining = totalSeconds
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(Color(red: 0.7, green: 0.5, blue: 1.0))
                     }
+                    .pickerStyle(.wheel)
+                    .frame(height: 150)
+                    .colorScheme(.dark)
+
+                    // Locks in the chosen duration and starts the timer
+                    Button("Start") {
+                        totalSeconds = selectedMinutes * 60
+                        secondsRemaining = selectedMinutes * 60
+                        isRunning = true
+                        isSelecting = false
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
+                    .font(.system(size: 20, weight: .light, design: .rounded))
                 }
-                .font(.title2)
+
+            } else {
+                // ── TIMER SCREEN ──────────────────────────────
+                VStack(spacing: 40) {
+                    // Inner ZStack layers the two rings and the countdown
+                    ZStack {
+                        // Faint track showing the full circle
+                        Circle()
+                            .stroke(Color.purple.opacity(0.2), lineWidth: 14)
+
+                        // Light purple arc that drains as time passes
+                        Circle()
+                            .trim(from: 0, to: progress)
+                            .stroke(
+                                Color(red: 0.7, green: 0.5, blue: 1.0),
+                                style: StrokeStyle(lineWidth: 14, lineCap: .round)
+                            )
+                            // Start the arc from the top of the circle
+                            .rotationEffect(.degrees(-90))
+                            // Smooth 1-second animation between each tick
+                            .animation(.linear(duration: 1), value: progress)
+
+                        // Countdown display
+                        Text(timeString)
+                            .font(.system(size: 56, weight: .light, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 260, height: 260)
+
+                    HStack(spacing: 24) {
+                        if isRunning {
+                            // Timer is running — only show the pause button
+                            Button("Pause") {
+                                isRunning = false
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
+                        } else {
+                            // Timer is paused — show resume on the left
+                            Button("Resume") {
+                                isRunning = true
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
+
+                            // Cancel stops the timer and returns to time selection
+                            Button("Cancel") {
+                                isRunning = false
+                                isSelecting = true
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(Color(red: 0.7, green: 0.5, blue: 1.0))
+                        }
+                    }
+                    .font(.title2)
+                }
             }
         }
         // Every second, subtract one if the timer is running
