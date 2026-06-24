@@ -39,6 +39,9 @@ struct ContentView: View {
         String(format: "%02d:%02d", secondsRemaining / 60, secondsRemaining % 60)
     }
 
+    // Shared spring used for screen and button transitions
+    let spring = Animation.spring(response: 0.5, dampingFraction: 0.8)
+
     var body: some View {
         ZStack {
             // Dark purple background filling the whole screen
@@ -67,12 +70,18 @@ struct ContentView: View {
                         totalSeconds = selectedMinutes * 60
                         secondsRemaining = selectedMinutes * 60
                         isRunning = true
-                        isSelecting = false
+                        // Animate the switch to the timer screen
+                        withAnimation(spring) { isSelecting = false }
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
                     .font(.system(size: 20, weight: .light, design: .rounded))
                 }
+                // Slide in from the left, slide out to the left
+                .transition(.asymmetric(
+                    insertion: .move(edge: .leading).combined(with: .opacity),
+                    removal:   .move(edge: .leading).combined(with: .opacity)
+                ))
 
             } else {
                 // ── TIMER SCREEN ──────────────────────────────
@@ -106,29 +115,41 @@ struct ContentView: View {
                         if isRunning {
                             // Timer is running — only show the pause button
                             Button("Pause") {
-                                isRunning = false
+                                withAnimation(spring) { isRunning = false }
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
+                            // Fade + scale in when it appears
+                            .transition(.opacity.combined(with: .scale(scale: 0.85)))
                         } else {
                             // Timer is paused — show resume on the left
                             Button("Resume") {
-                                isRunning = true
+                                withAnimation(spring) { isRunning = true }
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
+                            .transition(.opacity.combined(with: .scale(scale: 0.85)))
 
                             // Cancel stops the timer and returns to time selection
                             Button("Cancel") {
                                 isRunning = false
-                                isSelecting = true
+                                // Animate the switch back to the selection screen
+                                withAnimation(spring) { isSelecting = true }
                             }
                             .buttonStyle(.bordered)
                             .tint(Color(red: 0.7, green: 0.5, blue: 1.0))
+                            .transition(.opacity.combined(with: .scale(scale: 0.85)))
                         }
                     }
                     .font(.title2)
+                    // Animate the button swap when isRunning changes
+                    .animation(spring, value: isRunning)
                 }
+                // Slide in from the right, slide out to the right
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal:   .move(edge: .trailing).combined(with: .opacity)
+                ))
             }
         }
         // Every second, subtract one if the timer is running
