@@ -26,8 +26,23 @@ struct ContentView: View {
     // Whether the timer is actively ticking
     @State private var isRunning = false
 
+    // Subject list — starts with 4 premade options, grows if the user adds more
+    @State private var subjects = ["Math", "History", "Science", "English"]
+
+    // The subject the user tapped
+    @State private var selectedSubject: String? = nil
+
+    // Whether the new-subject text field is visible
+    @State private var showingNewSubject = false
+
+    // Text typed into the new subject field
+    @State private var newSubjectName = ""
+
     // Fires every second on the main thread
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    // Shared spring used across all transitions
+    let spring = Animation.spring(response: 0.5, dampingFraction: 0.8)
 
     // 1.0 when full, shrinks toward 0.0 as time runs out
     var progress: Double {
@@ -39,8 +54,8 @@ struct ContentView: View {
         String(format: "%02d:%02d", secondsRemaining / 60, secondsRemaining % 60)
     }
 
-    // Shared spring used for screen and button transitions
-    let spring = Animation.spring(response: 0.5, dampingFraction: 0.8)
+    // Start is only allowed once a subject is selected
+    var canStart: Bool { selectedSubject != nil }
 
     var body: some View {
         ZStack {
@@ -50,32 +65,119 @@ struct ContentView: View {
 
             if isSelecting {
                 // ── SELECTION SCREEN ──────────────────────────
-                VStack(spacing: 40) {
-                    Text("Focused")
-                        .font(.system(size: 36, weight: .light, design: .rounded))
-                        .foregroundStyle(.white)
+                ScrollView {
+                    VStack(spacing: 32) {
+                        Text("Focused")
+                            .font(.system(size: 36, weight: .light, design: .rounded))
+                            .foregroundStyle(.white)
 
-                    // Wheel picker for choosing the session length
-                    Picker("Duration", selection: $selectedMinutes) {
-                        ForEach([5, 10, 15, 20, 25, 30, 45, 60], id: \.self) { m in
-                            Text(m == 60 ? "1 hour" : "\(m) min").tag(m)
+                        // Wheel picker for choosing the session length
+                        Picker("Duration", selection: $selectedMinutes) {
+                            ForEach([5, 10, 15, 20, 25, 30, 45, 60], id: \.self) { m in
+                                Text(m == 60 ? "1 hour" : "\(m) min").tag(m)
+                            }
                         }
-                    }
-                    .pickerStyle(.wheel)
-                    .frame(height: 150)
-                    .colorScheme(.dark)
+                        .pickerStyle(.wheel)
+                        .frame(height: 150)
+                        .colorScheme(.dark)
 
-                    // Locks in the chosen duration and starts the timer
-                    Button("Start") {
-                        totalSeconds = selectedMinutes * 60
-                        secondsRemaining = selectedMinutes * 60
-                        isRunning = true
-                        // Animate the switch to the timer screen
-                        withAnimation(spring) { isSelecting = false }
+                        // Subject selection section
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text("Subject")
+                                .font(.system(size: 14, weight: .light, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.5))
+                                .padding(.horizontal, 4)
+
+                            // 2-column grid of subject chips
+                            LazyVGrid(
+                                columns: [GridItem(.flexible()), GridItem(.flexible())],
+                                spacing: 10
+                            ) {
+                                ForEach(subjects, id: \.self) { subject in
+                                    // Tapping a selected chip deselects it; tapping a new one selects it
+                                    Button(action: {
+                                        withAnimation(spring) {
+                                            selectedSubject = selectedSubject == subject ? nil : subject
+                                        }
+                                    }) {
+                                        Text(subject)
+                                            .font(.system(size: 15, weight: .light, design: .rounded))
+                                            .foregroundStyle(.white)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 12)
+                                            .background(
+                                                selectedSubject == subject
+                                                    ? Color(red: 0.5, green: 0.3, blue: 0.9)
+                                                    : Color.white.opacity(0.1)
+                                            )
+                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    }
+                                }
+                            }
+
+                            // Button to show the new subject text field
+                            Button(action: {
+                                withAnimation(spring) { showingNewSubject.toggle() }
+                            }) {
+                                Label(
+                                    showingNewSubject ? "Cancel" : "New Subject",
+                                    systemImage: showingNewSubject ? "xmark" : "plus"
+                                )
+                                .font(.system(size: 15, weight: .light, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+
+                            // Text field that slides in when adding a new subject
+                            if showingNewSubject {
+                                HStack(spacing: 10) {
+                                    TextField("Subject name", text: $newSubjectName)
+                                        .font(.system(size: 15, weight: .light, design: .rounded))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 12)
+                                        .background(Color.white.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .autocorrectionDisabled()
+
+                                    // Adds the new subject to the list and selects it
+                                    Button("Add") {
+                                        let name = newSubjectName.trimmingCharacters(in: .whitespaces)
+                                        guard !name.isEmpty else { return }
+                                        withAnimation(spring) {
+                                            subjects.append(name)
+                                            selectedSubject = name
+                                            newSubjectName = ""
+                                            showingNewSubject = false
+                                        }
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
+                                    .font(.system(size: 15, weight: .light, design: .rounded))
+                                    .disabled(newSubjectName.trimmingCharacters(in: .whitespaces).isEmpty)
+                                }
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
+                        }
+                        .padding(.horizontal, 4)
+
+                        // Locks in the chosen duration and subject and starts the timer
+                        Button("Start") {
+                            totalSeconds = selectedMinutes * 60
+                            secondsRemaining = selectedMinutes * 60
+                            isRunning = true
+                            withAnimation(spring) { isSelecting = false }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
+                        .font(.system(size: 20, weight: .light, design: .rounded))
+                        .disabled(!canStart)
+                        .opacity(canStart ? 1 : 0.4)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
-                    .font(.system(size: 20, weight: .light, design: .rounded))
+                    .padding(28)
                 }
                 // Slide in from the left, slide out to the left
                 .transition(.asymmetric(
@@ -86,6 +188,18 @@ struct ContentView: View {
             } else {
                 // ── TIMER SCREEN ──────────────────────────────
                 VStack(spacing: 40) {
+                    // Subject shown as a frosted pill above the ring
+                    if let subject = selectedSubject {
+                        Text(subject.uppercased())
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .tracking(2)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 7)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+
                     // Inner ZStack layers the two rings and the countdown
                     ZStack {
                         // Faint track showing the full circle
@@ -119,7 +233,6 @@ struct ContentView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
-                            // Fade + scale in when it appears
                             .transition(.opacity.combined(with: .scale(scale: 0.85)))
                         } else {
                             // Timer is paused — show resume on the left
@@ -133,7 +246,6 @@ struct ContentView: View {
                             // Cancel stops the timer and returns to time selection
                             Button("Cancel") {
                                 isRunning = false
-                                // Animate the switch back to the selection screen
                                 withAnimation(spring) { isSelecting = true }
                             }
                             .buttonStyle(.bordered)
