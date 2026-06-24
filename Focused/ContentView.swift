@@ -44,7 +44,7 @@ struct ContentView: View {
                     Circle()
                         .stroke(Color.purple.opacity(0.2), lineWidth: 14)
 
-                    // Light purple arc — trimmed by progress so it drains as time passes
+                    // Light purple arc, trimmed by progress so it drains as time passes
                     Circle()
                         .trim(from: 0, to: progress)
                         .stroke(
@@ -58,26 +58,35 @@ struct ContentView: View {
 
                     // Countdown display
                     Text(timeString)
-                        .font(.system(size: 72, weight: .thin, design: .monospaced))
+                        .font(.system(size: 56, weight: .light, design: .rounded))
                         .foregroundStyle(.white)
                 }
                 .frame(width: 260, height: 260)
 
                 HStack(spacing: 24) {
-                    // Toggles the timer on and off
-                    Button(isRunning ? "Stop" : "Start") {
-                        isRunning.toggle()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
+                    if isRunning {
+                        // Timer is running — only show the pause button
+                        Button("Pause") {
+                            isRunning = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
+                    } else {
+                        // Timer is paused — show start on the left, reset on the right
+                        Button("Start") {
+                            isRunning = true
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color(red: 0.5, green: 0.3, blue: 0.9))
 
-                    // Stops the timer and resets to 25 minutes
-                    Button("Reset") {
-                        isRunning = false
-                        secondsRemaining = totalSeconds
+                        // Stops the timer and resets to 25 minutes
+                        Button("Reset") {
+                            isRunning = false
+                            secondsRemaining = totalSeconds
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Color(red: 0.7, green: 0.5, blue: 1.0))
                     }
-                    .buttonStyle(.bordered)
-                    .tint(Color(red: 0.7, green: 0.5, blue: 1.0))
                 }
                 .font(.title2)
             }
