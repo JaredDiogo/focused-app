@@ -22,7 +22,7 @@ DerivedData/
 .swiftpm/
 .build/
 
-# CocoaPods (if you ever use it)
+# CocoaPods
 Pods/
 
 # Claude / AI tooling
